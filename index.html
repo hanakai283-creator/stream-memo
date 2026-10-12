@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配信オートカンペ＆AI議事メモ</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&family=Yusei+Magic&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --main-text-color: #ffffff;
+            --main-font: 'Meiryo', sans-serif;
+            --text-outline: 0px;
+            --text-shadow: 2px 2px 6px rgba(0,0,0,0.8);
+        }
+
+        body { font-family: var(--main-font); margin: 0; padding: 20px; background-color: #2c2f33; color: #ffffff; }
+        
+        .app-layout { display: flex; gap: 25px; align-items: flex-start; }
+        .left-pane { width: 400px; flex-shrink: 0; }
+        .right-pane { flex-grow: 1; min-width: 500px; }
+
+        .control-panel {
+            background: #23272a; padding: 20px; border-radius: 10px; margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid #444; transition: all 0.3s;
+        }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px; }
+        .panel-header.closed { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .panel-header h2 { margin: 0; font-size: 17px; color: #7289da; }
+        
+        .mode-switch-container { display: flex; background: #1e2124; border-radius: 8px; margin-bottom: 20px; border: 1px solid #555; overflow: hidden; }
+        .mode-switch-container input[type="radio"] { display: none; }
+        .mode-label { flex: 1; text-align: center; padding: 12px 10px; cursor: pointer; font-size: 14px; font-weight: bold; color: #888; transition: 0.2s; }
+        .mode-switch-container input[type="radio"]:checked + .mode-label { background: #7289da; color: white; }
+        
+        .manual-text { font-size: 13px; line-height: 1.6; color: #ddd; }
+        .manual-text h3 { font-size: 14px; color: #43b581; margin: 15px 0 5px 0; border-bottom: 1px dashed #555; padding-bottom: 5px; }
+        .manual-text p { margin: 0 0 10px 0; }
+
+        .ad-placeholder { background: #23272a; padding: 15px; border-radius: 10px; border: 1px dashed #777; text-align: center; color: #aaa; font-size: 12px; }
+        .ad-box { width: 100%; height: 250px; background: #2c2f33; display: flex; align-items: center; justify-content: center; border-radius: 5px; margin-top: 10px; }
+
+        input[type="password"], textarea, select { padding: 8px; border-radius: 5px; border: 1px solid #555; background: #333; color: white; width: 100%; box-sizing: border-box; font-family: 'Meiryo', sans-serif; }
+        button { padding: 10px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        
+        .btn-toggle { background-color: #4f545c; color: white; padding: 5px 10px; font-size: 13px; }
+        .btn-toggle:hover { background-color: #686d73; }
+        #saveKeyBtn, #saveCustomPromptBtn { background-color: #43b581; color: white; margin-top: 5px; width: 100%; }
+        #saveKeyBtn:hover, #saveCustomPromptBtn:hover { background-color: #3ca374; }
+        
+        .action-buttons { display: flex; gap: 10px; margin-top: 15px; }
+        #startBtn { background-color: #7289da; color: white; font-size: 16px; width: 55%; margin: 0; }
+        #startBtn:hover { background-color: #5b6eae; }
+        #clearScreenBtn { background-color: #f04747; color: white; font-size: 13px; width: 45%; margin: 0; padding: 10px; }
+        #clearScreenBtn:hover { background-color: #c83b3b; }
+        
+        #statusMessage { color: #f04747; font-weight: bold; margin-top: 10px; display: block; text-align: center; }
+        
+        .design-area { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #555; }
+        .design-area-row { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; }
+        .design-area label { cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; font-weight: bold; }
+        .design-area input[type="checkbox"] { transform: scale(1.3); cursor: pointer; }
+        .design-area input[type="color"] { cursor: pointer; border: none; width: 35px; height: 35px; padding: 0; background: none; border-radius: 50%; }
+        .design-area select, .design-area input[type="range"] { padding: 5px; cursor: pointer; width: 100%; box-sizing: border-box; margin-top: 5px;}
+
+        .export-area { margin-top: 20px; padding: 15px; background: #2f3136; border-radius: 8px; border: 1px solid #555; }
+        .export-area h3 { margin: 0 0 10px 0; font-size: 15px; color: #faa61a; }
+        .history-list { max-height: 250px; overflow-y: auto; background: #202225; padding: 10px; border-radius: 5px; border: 1px solid #444; margin-bottom: 10px; }
+        .history-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px; border-bottom: 1px solid #444; font-size: 13px; }
+        .history-item:last-child { border-bottom: none; }
+        .history-item input[type="checkbox"] { margin-top: 4px; transform: scale(1.2); cursor: pointer;}
+        .history-text { white-space: pre-wrap; line-height: 1.4; color: #ddd; }
+        .export-controls { display: flex; flex-direction: column; gap: 10px; }
+        .btn-export { background-color: #f1c40f; color: #333; width: 100%; }
+        .btn-export:hover { background-color: #d4ac0d; }
+        .btn-delete { background-color: #f04747; color: white; width: 100%; }
+        .btn-delete:hover { background-color: #c83b3b; }
+
+        .overlay-container, .preview-container { border-radius: 10px; transition: background-color 0.3s; position: relative; }
+        .overlay-container { padding: 25px; min-height: 700px; height: 100%; }
+        .bg-normal { background-color: #1e2124; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); border: 1px dashed #555; }
+        .bg-chroma { background-color: #00ff00; border: none; }
+
+        .summary-card { background: rgba(0, 0, 0, 0.75); padding: 15px 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 2px 2px 10px rgba(0,0,0,0.5); animation: slideUp 0.4s ease-out; }
+        .no-anim { animation: none; margin-bottom: 0; }
+        .current-card { border-left: 6px solid #f1c40f; } 
+        .past-card { border-left: 6px solid #43b581; opacity: 0.85; transform: scale(0.98); transform-origin: left top; }
+
+        .highlight-card { background: rgba(20, 5, 5, 0.85); border: 2px solid #e74c3c; border-left: 8px solid #e74c3c; border-radius: 12px; padding: 15px 20px; margin-bottom: 25px; box-shadow: 0 0 15px rgba(231, 76, 60, 0.4); display: none; animation: fadeIn 0.8s ease-in-out; }
+        .highlight-label { color: #e74c3c; font-size: 26px; margin-bottom: 8px; display: inline-block; -webkit-text-stroke-color: #333; text-shadow: 0 0 5px rgba(231,76,60,0.8); }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .log-summary, .topic-label, .highlight-text, .highlight-label { color: var(--main-text-color); font-family: var(--main-font); text-shadow: var(--text-shadow); -webkit-text-stroke-width: var(--text-outline); -webkit-text-stroke-color: #000000; paint-order: stroke fill; }
+        .log-summary, .highlight-text { font-size: 22px; font-weight: bold; line-height: 1.6; }
+        .topic-label { font-size: 24px; margin-bottom: 8px; display: inline-block; }
+        .current-label { color: #f1c40f; -webkit-text-stroke-color: #333; }
+        .past-label { color: #43b581; font-size: 18px; -webkit-text-stroke-color: #333; }
+        .log-loading { color: #faa61a; font-size: 16px; font-weight: bold; }
+        .log-error { color: #f04747; font-size: 16px; font-weight: bold; border-left: 6px solid #f04747; }
+        .section-divider { border-bottom: 2px dashed rgba(255,255,255,0.2); margin: 30px 0 20px 0; }
+
+        .mode-memo-active .design-area-visual { display: none; }
+        .mode-memo-active .right-pane .overlay-container { background-color: #f7f9fa; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); border: 1px solid #ddd; }
+        .mode-memo-active .right-pane .summary-card { background: #ffffff; border: 1px solid #eee; border-left: 6px solid #f39c12; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-radius: 8px;}
+        .mode-memo-active .right-pane .past-card { border-left: 6px solid #2ecc71; opacity: 1; transform: scale(1); margin-bottom: 15px;}
+        .mode-memo-active .right-pane .highlight-card { background: #e8f4fd; border: 1px solid #3498db; border-left: 8px solid #3498db; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+        .mode-memo-active .log-summary, 
+        .mode-memo-active .topic-label, 
+        .mode-memo-active .highlight-text, 
+        .mode-memo-active .highlight-label {
+            text-shadow: none !important; -webkit-text-stroke-width: 0 !important; color: #333 !important; font-family: 'Meiryo', sans-serif !important;
+        }
+        .mode-memo-active .log-summary { font-size: 18px; font-weight: normal; }
+        .mode-memo-active .highlight-text { font-size: 18px; font-weight: normal; }
+        .mode-memo-active .highlight-label { color: #2980b9 !important; font-size: 22px; }
+        .mode-memo-active .current-label { color: #d35400 !important; font-size: 20px; }
+        .mode-memo-active .past-label { color: #27ae60 !important; font-size: 18px; }
+        .mode-memo-active #tempText { color: #666 !important; font-weight: normal;}
+        /* =========================================
+           📱 スマホ向けレスポンシブ（縦並び）対応
+           ========================================= */
+        @media screen and (max-width: 900px) {
+            .app-layout { flex-direction: column; gap: 15px; }
+            .left-pane { width: 100%; }
+            .right-pane { width: 100%; min-width: auto; }
+            .overlay-container { min-height: 500px; padding: 15px; }
+            .action-buttons { flex-direction: column; }
+            #startBtn, #clearScreenBtn { width: 100%; }
+        }
+</style>
+</head>
+<body>
+
+    <div class="app-layout">
+        <div class="left-pane">
+            
+            <div class="control-panel" id="manualPanel">
+                <div class="panel-header" id="manualHeader">
+                    <h2>📖 マニュアル</h2>
+                    <button id="toggleManualBtn" class="btn-toggle">🔼 閉じる</button>
+                </div>
+                <div id="manualContent" class="manual-text">
+                    <h3>■ ツールの概要</h3>
+                    <p>このツールは、用途に合わせて2つのモードで利用できます。</p>
+                    <p><b>🎥 配信用 (OBS)：</b> 音声をリアルタイムで認識し、「要約テロップ」や「番組の見どころ」を自動でOBSに表示するオーバーレイ機能。<br>
+                    <b>📝 議事メモ用 (自分用)：</b> アイデア出しや思考の整理用に、話した内容を「論理的なノート」や「TODO」として構造化してまとめる機能。</p>
+                    
+                    <h3>■ 初期設定と使い方</h3>
+                    <p>1. ご自身の <b>Gemini APIキー</b> を取得し、下の設定パネルに入力して「キーを保存」を押します。<br>
+                    2. カスタムプロンプト（前提条件や独自用語）があれば入力します。<br>
+                    3. 「🎤 マイク開始」ボタンを押し、ブラウザのマイク許可を出して話し始めます。<br>
+                    4. スライダーで設定した文字数に達するごとに、AIが自動で要約を生成します。</p>
+
+                    <h3>■ OBSへの表示方法（配信用モード時）</h3>
+                    <p>1. OBSのソースに「ウィンドウキャプチャ」を追加し、このブラウザ画面を選択します。<br>
+                    2. <b>Altキーを押しながら</b>枠をドラッグ（クロップ）し、右側の緑枠の領域だけを切り抜きます。<br>
+                    3. OBSのフィルタから「クロマキー」を追加し、緑色を透過させて配信画面に乗せます。</p>
+                    
+                    <h3>■ よくある質問（FAQ）</h3>
+                    <p><b>Q. 要約が途切れる・通信エラーが出る</b><br>
+                    A. APIの混雑が原因の場合、設定パネルの「使用するAIモデル」を変更すると改善することがあります。または「AI要約を開始する文字数」を調整してください。</p>
+                    <p><b>Q. データは安全ですか？</b><br>
+                    A. APIキー等の設定や要約履歴はすべてブラウザ内（ローカル）に保存され、外部サーバーには一切送信されません。安心してご利用ください。</p>
+                </div>
+            </div>
+
+            <div class="control-panel" id="controlPanel">
+                <div class="mode-switch-container">
+                    <input type="radio" id="modeObs" name="appMode" value="obs" checked>
+                    <label for="modeObs" class="mode-label">🎥 配信用 (OBS)</label>
+                    <input type="radio" id="modeMemo" name="appMode" value="memo">
+                    <label for="modeMemo" class="mode-label">📝 議事メモ (自分用)</label>
+                </div>
+
+                <div class="panel-header" id="panelHeader" style="margin-top: 10px;">
+                    <h2>⚙️ 設定パネル</h2>
+                    <button id="togglePanelBtn" class="btn-toggle">🔼 閉じる</button>
+                </div>
+                
+                <div id="panelContent">
+                    <div id="apiErrorAlert" style="display: none; background-color: #f04747; color: white; padding: 12px; border-radius: 5px; margin-bottom: 20px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); animation: fadeIn 0.4s;">
+                        ⚠️ 本日の「無料枠」の上限に達しました！<br>
+                        <span style="font-size: 12px; font-weight: normal; margin-top: 5px; display: inline-block;">引き続き利用するにはAPIキーを設定してください。</span>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label for="apiKeyInput" style="font-size: 13px;">🔑 Gemini APIキー：</label>
+                        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." style="margin-top: 5px;">
+                        <button id="saveKeyBtn">キーを保存</button>
+                        
+                        <!-- ★ 修正：モデル名から「最新」を削除し、無料枠モデルを追加 -->
+                        <div style="margin-top: 15px;">
+                            <label for="aiModelSelect" style="font-size: 13px;">🤖 使用するAIモデル <span style="color:#aaa; font-size:11px;">(※キー設定時のみ有効)</span>：</label>
+                            <select id="aiModelSelect" style="margin-top: 5px; cursor: pointer;">
+                                <option value="gemini-3.8-flash">Gemini 3.8 Flash (高速モデル / 無料枠あり)</option>
+                                <option value="gemini-3.5-flash">Gemini 3.5 Flash (標準モデル / 無料枠あり)</option>
+                                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (高性能モデル)</option>
+                                <option value="gemma-4-31b-it">Gemma 4 31B IT (オープンモデル)</option>
+                            </select>
+                        </div>
+
+                        <div style="font-size: 11px; color: #faa61a; margin-top: 10px; line-height: 1.5; background: rgba(250, 166, 26, 0.1); padding: 8px; border-radius: 5px; border-left: 3px solid #faa61a;">
+                            ※ APIキー未設定時は「共有枠（モデル固定）」で動作します。上限に達すると停止するため、安定利用にはご自身のAPIキーを設定してください。
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label for="customPromptInput" style="font-size: 13px;">📝 前提条件・独自用語（設定や背景など）：</label>
+                        <textarea id="customPromptInput" rows="3" placeholder="例：今は「新規事業のブレスト」をしています。または「ゲーム名：マイクラ」など" style="margin-top: 5px; resize: vertical; font-size: 12px;"></textarea>
+                        <button id="saveCustomPromptBtn">条件を保存</button>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button id="startBtn">🎤 マイク開始</button>
+                        <button id="clearScreenBtn">🧹 画面をリセット</button>
+                    </div>
+                    <span id="statusMessage">停止中</span>
+
+                    <div class="design-area">
+                        <div class="design-area-row">
+                            <label style="color: #faa61a;"><input type="checkbox" id="autoHighlightToggle" checked> 🔥 全体まとめ（ハイライト/TODO）自動更新</label>
+                            <label style="width: 100%; border-top: 1px dashed #555; padding-top: 10px; margin-top: 5px;">
+                                ⏱️ AI要約を開始する文字数：<span id="triggerLengthValue" style="float: right; color: #7289da;">50文字</span>
+                                <input type="range" id="triggerLengthSlider" min="30" max="250" step="10" value="50">
+                            </label>
+                        </div>
+
+                        <div class="design-area-visual">
+                            <div class="design-area-row" style="margin-top: 10px;">
+                                <label><input type="checkbox" id="chromaToggle"> 🟩 クロマキー背景（緑）にする</label>
+                            </div>
+                            <div style="font-size: 12px; color: #aaa; margin-bottom: 5px; margin-top: 10px;">▼ デザイン プレビュー</div>
+                            <div id="previewBox" class="preview-container bg-normal" style="padding: 10px; margin-bottom: 15px;">
+                                <div class="summary-card current-card no-anim">
+                                    <div class="log-summary" style="font-size: 16px;">
+                                        <strong class="topic-label current-label" style="font-size: 18px;">✨ 今の話題</strong><br>
+                                        ここにテロップのサンプルが出ます。
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="design-area-row">
+                                <label style="width: 100%;">🎨 文字色：<input type="color" id="textColorPicker" value="#ffffff"></label>
+                                <label style="width: 100%; display: block;">🔤 フォント：
+                                    <select id="fontSelect">
+                                        <option value="'Meiryo', sans-serif">メイリオ（標準）</option>
+                                        <option value="'M PLUS Rounded 1c', sans-serif">丸ゴシック（配信用）</option>
+                                        <option value="'Yusei Magic', sans-serif">手書き風（エモい）</option>
+                                    </select>
+                                </label>
+                                <label style="width: 100%; display: block;">⬛ 黒縁の太さ：<span id="outlineValue" style="float: right;">0px</span>
+                                    <input type="range" id="outlineSlider" min="0" max="3" step="0.5" value="0">
+                                </label>
+                                <label style="width: 100%;">🌑 影（シャドウ）：<input type="checkbox" id="shadowToggle" checked></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="export-area">
+                        <h3>📜 保存済みストック一覧</h3>
+                        <div class="export-controls" style="margin-bottom: 10px;">
+                            <label style="font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" id="selectAllHistory"> 全て選択
+                            </label>
+                        </div>
+                        <div id="historyList" class="history-list">
+                            <div style="color:#aaa; font-size:12px; text-align:center;">ここに要約履歴がストックされます</div>
+                        </div>
+                        <div class="export-controls">
+                            <button id="exportBtn" class="btn-export">📥 テキストで保存(.txt)</button>
+                            <button id="deleteSelectedBtn" class="btn-delete">🗑️ 選択項目を削除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ad-placeholder">
+                <div style="margin-bottom: 10px; color: #777;">スポンサーリンク</div>
+                <div class="ad-box">広告（300×250など）表示領域</div>
+            </div>
+            
+        </div>
+
+        <div class="right-pane">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+                <div id="rightPaneMessage" style="color: #bbb; font-size: 14px; font-weight: bold;">▼ 下の枠内だけをOBSでウィンドウキャプチャ（クロップ）してください</div>
+                <button id="toggleVisibilityBtn" style="background-color: #4f545c; color: white; font-size: 13px; padding: 8px 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s;">
+                    👁️ 一時非表示にする
+                </button>
+            </div>
+            
+            <div id="overlayContainer" class="overlay-container bg-normal">
+                <div id="obsContentWrapper" style="transition: opacity 0.3s; opacity: 1;">
+                    <div id="highlightArea" class="highlight-card">
+                        <strong class="highlight-label" id="highlightLabel">🔥 配信の見どころ</strong>
+                        <div id="highlightText" class="highlight-text"></div>
+                    </div>
+                    <div id="tempText" style="color: #ccc; font-weight: bold; font-size: 18px; margin-bottom: 15px; min-height: 27px;"></div>
+                    <div id="currentTopicArea"></div>
+                    <div id="pastTopicsArea"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
