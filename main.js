@@ -56,8 +56,11 @@ const GAS_SECRET_TOKEN = "AutoCampe_Secret_2026";
 
 
 // ==========================================
-// 2. モード切り替えのロジック
+// 2. グローバル変数＆モード切り替えのロジック
 // ==========================================
+let isApiLimitReached = false; // ★ 追加：上限エラー状態を管理するフラグ
+let summaryCount = 0; 
+
 let currentMode = localStorage.getItem('gemini_app_mode') || 'obs';
 const modeObs = document.getElementById('modeObs');
 const modeMemo = document.getElementById('modeMemo');
@@ -127,6 +130,11 @@ saveKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     if (key) { localStorage.setItem('gemini_api_key', key); keyStatusMessage.textContent = "✅ キーを保存しました（自分用モード）"; } 
     else { localStorage.removeItem('gemini_api_key'); keyStatusMessage.textContent = "🗑️ キーを削除しました（お試し枠モード）"; }
+    
+    // ★ 追加：キーを変更したらエラー状態（ロック）を解除する
+    isApiLimitReached = false;
+    apiErrorAlert.style.display = 'none';
+
     setTimeout(() => { keyStatusMessage.textContent = ""; }, 3000);
 });
 
@@ -196,15 +204,24 @@ recognition.onresult = (event) => {
     }
 };
 recognition.onend = () => { if (isRecording) recognition.start(); else { statusMessage.textContent = "停止中"; statusMessage.style.color = "#f04747"; startBtn.textContent = "🎤 マイク開始"; } };
-startBtn.addEventListener('click', () => { if (isRecording) { isRecording = false; recognition.stop(); } else { accumulatedText = ""; tempTextDisplay.textContent = ""; recognition.start(); } });
+
+startBtn.addEventListener('click', () => { 
+    if (isRecording) { 
+        isRecording = false; recognition.stop(); 
+    } else { 
+        // ★ 追加：エラー状態ならマイクをオンにさせない（ブロック）
+        if (isApiLimitReached) {
+            alert("APIの利用上限に達しているため、マイクを開始できません。\nAPIキーを設定し直すか、時間をおいてお試しください。");
+            return;
+        }
+        accumulatedText = ""; tempTextDisplay.textContent = ""; recognition.start(); 
+    } 
+});
 
 
 // ==========================================
 // 6. Gemini API ＆ GAS中継サーバーの通信処理
 // ==========================================
-let isApiLimitReached = false;
-let summaryCount = 0; 
-
 function getCustomInstructionText() {
     const customText = customPromptInput.value.trim();
     return customText ? `\n\n【前提条件・独自ルール】\n${customText}\n` : "";
@@ -282,7 +299,6 @@ async function triggerSummary(text) {
     currentTopicArea.appendChild(loadingItem);
 
     try {
-        // ★ 修正：こまめな要約は「深く整理しすぎない短いメモ」へ変更
         let basePrompt = currentMode === 'obs' 
             ? `あなたはライブ配信の優秀なアシスタントです。以下の配信者のトーク内容を、視聴者がパッと見て分かるように短い箇条書きで要約してください。返事や前置きは一切不要で、要約の結果のみを出力してください。`
             : `あなたは優秀な秘書です。以下のユーザーが音声で話した内容を、簡潔な短いメモとして要約してください。この段階では深く整理・構造化しすぎず、何について話したかがサッと分かる程度の軽い箇条書き（1〜2行程度）に留めてください。返事や前置きは不要です。`;
@@ -304,7 +320,16 @@ async function triggerSummary(text) {
 
     } catch (error) {
         if (error.message === "RATE_LIMIT") {
-            loadingItem.remove(); apiErrorAlert.style.display = 'block';
+            loadingItem.remove(); 
+            apiErrorAlert.style.display = 'block';
+            
+            // ★ 追加：上限到達時にマイクを強制ストップし、フラグを立てる
+            isApiLimitReached = true;
+            if (isRecording) {
+                isRecording = false;
+                recognition.stop();
+            }
+
             if (panelContent.style.display === 'none') togglePanelBtn.click();
         } else {
             loadingItem.className = 'summary-card log-error'; loadingItem.innerHTML = `❌ 通信エラーが発生しました。`;
@@ -322,7 +347,6 @@ async function generateHighlight() {
         const isTrial = apiKeyInput.value.trim() === "" ? " (お試し枠)" : "";
         highlightText.innerHTML = `<span style="color: #faa61a; font-size: 16px;">⏳ 全体を分析中...${isTrial}</span>`;
 
-        // ★ 修正：全体のまとめは「断片的なメモを統合し、構造化して綺麗にまとめる」ように強化
         let basePrompt = currentMode === 'obs'
             ? `あなたはライブ配信の敏腕ディレクターです。以下のテキストはここまでの配信で話された全記録です。この全体を通して、視聴者が一番興味を持ちそうな「現在の配信のハイライト（見どころ）」を1〜2行で魅力的にまとめてください。前置きは不要です。`
             : `あなたは優秀な秘書・アイデア整理のプロです。以下のテキストはここまでの思考・ブレストの断片的なメモの全記録です。これらを統合し、最終的な「結論」や「重要な気づき」、次にやるべき「TODO」を、見出しや箇条書きを使って議事録として綺麗に構造化してまとめてください。前置きは不要です。`;
@@ -340,6 +364,14 @@ async function generateHighlight() {
         highlightArea.style.display = "none"; 
         if (error.message === "RATE_LIMIT") {
             apiErrorAlert.style.display = 'block';
+
+            // ★ 追加：上限到達時にマイクを強制ストップし、フラグを立てる
+            isApiLimitReached = true;
+            if (isRecording) {
+                isRecording = false;
+                recognition.stop();
+            }
+
             if (panelContent.style.display === 'none') togglePanelBtn.click();
         }
     }
