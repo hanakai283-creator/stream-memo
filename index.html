@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>配信オートカンペ＆AI議事メモ</title>
     
+    <!-- ★ 追加：Google Analytics 測定タグ -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VNQK17G5S0"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-VNQK17G5S0');
+    </script>
+    
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&family=Yusei+Magic&display=swap" rel="stylesheet">
 
     <style>
@@ -17,7 +26,6 @@
 
         body { font-family: var(--main-font); margin: 0; padding: 20px; background-color: #2c2f33; color: #ffffff; }
         
-        /* ★ 修正：タイトルのスタイルを調整 */
         .app-title-box { text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #444; width: 100%; max-width: 1200px; }
         .app-title-main { font-family: 'M PLUS Rounded 1c', sans-serif; margin: 0; font-size: 28px; color: #ffffff; text-shadow: 2px 2px 5px rgba(0,0,0,0.5); letter-spacing: 1px; }
         .app-title-sub { font-size: 14px; color: #43b581; font-weight: bold; margin-top: 5px; letter-spacing: 2px; }
@@ -126,7 +134,6 @@
         .mode-memo-active .past-label { color: #27ae60 !important; font-size: 18px; }
         .mode-memo-active #tempText { color: #666 !important; font-weight: normal;}
 
-        /* スマホ向けレスポンシブ（縦並び）対応 */
         @media screen and (max-width: 900px) {
             body { padding: 10px; }
             .app-title-box { margin-bottom: 15px; padding-bottom: 10px; }
@@ -141,7 +148,6 @@
 </head>
 <body>
 
-    <!-- ★ 修正：タイトル（ロゴ）をパネルの外、ページ全体の一番上に配置 -->
     <div class="app-title-box">
         <h1 class="app-title-main">🎤 配信オートカンペ</h1>
         <div class="app-title-sub">＆ AI議事メモ</div>
@@ -177,6 +183,11 @@
                     A. APIの混雑が原因の場合、設定パネルの「使用するAIモデル」を変更すると改善することがあります。または「AI要約を開始する文字数」を調整してください。</p>
                     <p><b>Q. データは安全ですか？</b><br>
                     A. APIキー等の設定や要約履歴はすべてブラウザ内（ローカル）に保存され、外部サーバーには一切送信されません。安心してご利用ください。</p>
+
+                    <!-- ★ 追加：AdSense・GA4用のリンク -->
+                    <div style="margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; text-align: center;">
+                        <a href="privacy.html" target="_blank" style="color: #7289da; text-decoration: none; font-size: 12px;">プライバシーポリシー・利用規約</a>
+                    </div>
                 </div>
             </div>
 
