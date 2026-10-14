@@ -191,7 +191,6 @@ let isRecording = false; let accumulatedText = "";
 recognition.onstart = () => { 
     isRecording = true; statusMessage.textContent = "🎙️ 録音中..."; statusMessage.style.color = "#43b581"; startBtn.textContent = "⏹️ マイク停止"; 
     
-    // ★ GA4解析：マイクの利用開始を計測
     if (typeof gtag === 'function') {
         gtag('event', 'mic_started', {
             'app_mode': currentMode
@@ -263,9 +262,16 @@ async function callAI(promptText) {
         
         if (data.error) {
             const errorString = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
-            if (errorString.includes("quota") || errorString.includes("429")) {
+            console.error("GASからのエラー詳細:", errorString); // デバッガー用にエラー内容を表示
+
+            // ★修正：日本語のエラー文言や、Googleが返す一般的な上限エラーのキーワードを広くキャッチする
+            const limitKeywords = ["quota", "429", "too many", "exceeded", "limit", "多すぎ", "制限", "上限"];
+            const isRateLimit = limitKeywords.some(keyword => errorString.toLowerCase().includes(keyword));
+
+            if (isRateLimit) {
                 throw new Error("RATE_LIMIT");
             }
+            
             throw new Error("APIエラー");
         }
         return data.text;
@@ -317,7 +323,6 @@ async function triggerSummary(text) {
         addHistoryToList(summaryResult, text);
         summaryCount++; 
 
-        // ★ GA4解析：要約が成功したタイミングで、どのキー・モードが使われたかを送信
         if (typeof gtag === 'function') {
             const apiType = apiKeyInput.value.trim() !== "" ? "own_key" : "trial_gas";
             gtag('event', 'summary_success', {
@@ -371,7 +376,6 @@ async function generateHighlight() {
         highlightArea.style.animation = "none";
         setTimeout(() => { highlightArea.style.animation = "fadeIn 0.8s ease-in-out"; }, 10);
 
-        // ★ GA4解析：ハイライト機能が使われたことを送信
         if (typeof gtag === 'function') {
             const apiType = apiKeyInput.value.trim() !== "" ? "own_key" : "trial_gas";
             gtag('event', 'highlight_success', {
