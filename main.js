@@ -143,7 +143,8 @@ aiModelSelect.addEventListener('change', (e) => { localStorage.setItem('gemini_a
 const savedCustomPrompt = localStorage.getItem('gemini_custom_prompt'); if (savedCustomPrompt) customPromptInput.value = savedCustomPrompt;
 saveCustomPromptBtn.addEventListener('click', () => { localStorage.setItem('gemini_custom_prompt', customPromptInput.value.trim()); promptStatusMessage.textContent = "✅ 用語を保存しました"; setTimeout(() => { promptStatusMessage.textContent = ""; }, 3000); });
 
-let TRIGGER_LENGTH = parseInt(localStorage.getItem('gemini_trigger_length')) || 50;
+// ★ 修正：デフォルトの文字数を150文字に引き上げ
+let TRIGGER_LENGTH = parseInt(localStorage.getItem('gemini_trigger_length')) || 150;
 triggerLengthSlider.value = TRIGGER_LENGTH; triggerLengthValue.textContent = TRIGGER_LENGTH + '文字';
 triggerLengthSlider.addEventListener('input', (e) => { TRIGGER_LENGTH = parseInt(e.target.value); triggerLengthValue.textContent = TRIGGER_LENGTH + '文字'; localStorage.setItem('gemini_trigger_length', TRIGGER_LENGTH); });
 
@@ -192,11 +193,10 @@ recognition.onstart = () => {
     isRecording = true; statusMessage.textContent = "🎙️ 録音中..."; statusMessage.style.color = "#43b581"; startBtn.textContent = "⏹️ マイク停止"; 
     
     if (typeof gtag === 'function') {
-        gtag('event', 'mic_started', {
-            'app_mode': currentMode
-        });
+        gtag('event', 'mic_started', { 'app_mode': currentMode });
     }
 };
+
 recognition.onresult = (event) => {
     let interimTranscript = ''; let finalTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -204,13 +204,41 @@ recognition.onresult = (event) => {
         if (event.results[i].isFinal) finalTranscript += transcript;
         else interimTranscript += transcript;
     }
+    
     tempTextDisplay.textContent = interimTranscript;
+
+    // ★ 修正：マイクの強制再起動を廃止し、確定したテキストのロールオーバー処理を実装
     if (finalTranscript !== '') {
-        accumulatedText += finalTranscript + " "; tempTextDisplay.textContent = ""; 
-        if (accumulatedText.length >= TRIGGER_LENGTH) { triggerSummary(accumulatedText); accumulatedText = ""; }
+        accumulatedText += finalTranscript; 
+        tempTextDisplay.textContent = ""; 
+
+        // 蓄積されたテキストが設定文字数（例:150）を超えた場合
+        if (accumulatedText.length >= TRIGGER_LENGTH) {
+            // 最も後ろにある「。」「！」「？」「改行」を探す（貪欲マッチ）
+            const match = accumulatedText.match(/.*[。！？!?\n]/);
+            
+            if (match) {
+                // 区切り文字が存在する場合、そこまでを切り出して要約へ送る
+                const targetText = match[0];
+                // 切り出した部分以降（はみ出た文章）は、次回のためにストックに残す（ロールオーバー）
+                accumulatedText = accumulatedText.substring(targetText.length).trim(); 
+                triggerSummary(targetText);
+            } else {
+                // 句点が一切ない長文（例えば150文字ずっと丸がない）が来た場合は、そのまま全部送る
+                triggerSummary(accumulatedText);
+                accumulatedText = "";
+            }
+        }
     }
 };
-recognition.onend = () => { if (isRecording) recognition.start(); else { statusMessage.textContent = "停止中"; statusMessage.style.color = "#f04747"; startBtn.textContent = "🎤 マイク開始"; } };
+
+recognition.onend = () => { 
+    if (isRecording) {
+        recognition.start(); 
+    } else { 
+        statusMessage.textContent = "停止中"; statusMessage.style.color = "#f04747"; startBtn.textContent = "🎤 マイク開始"; 
+    } 
+};
 
 startBtn.addEventListener('click', () => { 
     if (isRecording) { 
@@ -262,9 +290,8 @@ async function callAI(promptText) {
         
         if (data.error) {
             const errorString = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
-            console.error("GASからのエラー詳細:", errorString); // デバッガー用にエラー内容を表示
+            console.error("GASからのエラー詳細:", errorString);
 
-            // ★修正：日本語のエラー文言や、Googleが返す一般的な上限エラーのキーワードを広くキャッチする
             const limitKeywords = ["quota", "429", "too many", "exceeded", "limit", "多すぎ", "制限", "上限"];
             const isRateLimit = limitKeywords.some(keyword => errorString.toLowerCase().includes(keyword));
 
