@@ -58,7 +58,7 @@ const GAS_SECRET_TOKEN = "AutoCampe_Secret_2026";
 // ==========================================
 // 2. グローバル変数＆モード切り替えのロジック
 // ==========================================
-let isApiLimitReached = false; // ★ 追加：上限エラー状態を管理するフラグ
+let isApiLimitReached = false; 
 let summaryCount = 0; 
 
 let currentMode = localStorage.getItem('gemini_app_mode') || 'obs';
@@ -131,7 +131,6 @@ saveKeyBtn.addEventListener('click', () => {
     if (key) { localStorage.setItem('gemini_api_key', key); keyStatusMessage.textContent = "✅ キーを保存しました（自分用モード）"; } 
     else { localStorage.removeItem('gemini_api_key'); keyStatusMessage.textContent = "🗑️ キーを削除しました（お試し枠モード）"; }
     
-    // ★ 追加：キーを変更したらエラー状態（ロック）を解除する
     isApiLimitReached = false;
     apiErrorAlert.style.display = 'none';
 
@@ -189,7 +188,16 @@ const recognition = new SpeechRecognition();
 recognition.lang = 'ja-JP'; recognition.continuous = true; recognition.interimResults = true;
 let isRecording = false; let accumulatedText = "";
 
-recognition.onstart = () => { isRecording = true; statusMessage.textContent = "🎙️ 録音中..."; statusMessage.style.color = "#43b581"; startBtn.textContent = "⏹️ マイク停止"; };
+recognition.onstart = () => { 
+    isRecording = true; statusMessage.textContent = "🎙️ 録音中..."; statusMessage.style.color = "#43b581"; startBtn.textContent = "⏹️ マイク停止"; 
+    
+    // ★ GA4解析：マイクの利用開始を計測
+    if (typeof gtag === 'function') {
+        gtag('event', 'mic_started', {
+            'app_mode': currentMode
+        });
+    }
+};
 recognition.onresult = (event) => {
     let interimTranscript = ''; let finalTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -209,7 +217,6 @@ startBtn.addEventListener('click', () => {
     if (isRecording) { 
         isRecording = false; recognition.stop(); 
     } else { 
-        // ★ 追加：エラー状態ならマイクをオンにさせない（ブロック）
         if (isApiLimitReached) {
             alert("APIの利用上限に達しているため、マイクを開始できません。\nAPIキーを設定し直すか、時間をおいてお試しください。");
             return;
@@ -259,10 +266,6 @@ async function callAI(promptText) {
             if (errorString.includes("quota") || errorString.includes("429")) {
                 throw new Error("RATE_LIMIT");
             }
-            if (errorString.includes("トークンが一致しません")) {
-                console.error("セキュリティ警告: GASの合言葉が一致しません。");
-            }
-            console.error("GASからのエラー詳細:", data.error);
             throw new Error("APIエラー");
         }
         return data.text;
@@ -314,6 +317,16 @@ async function triggerSummary(text) {
         addHistoryToList(summaryResult, text);
         summaryCount++; 
 
+        // ★ GA4解析：要約が成功したタイミングで、どのキー・モードが使われたかを送信
+        if (typeof gtag === 'function') {
+            const apiType = apiKeyInput.value.trim() !== "" ? "own_key" : "trial_gas";
+            gtag('event', 'summary_success', {
+                'api_type': apiType,
+                'app_mode': currentMode,
+                'ai_model': aiModelSelect.value
+            });
+        }
+
         if (autoHighlightToggle.checked && summaryCount % 3 === 0) {
             generateHighlight();
         }
@@ -323,7 +336,6 @@ async function triggerSummary(text) {
             loadingItem.remove(); 
             apiErrorAlert.style.display = 'block';
             
-            // ★ 追加：上限到達時にマイクを強制ストップし、フラグを立てる
             isApiLimitReached = true;
             if (isRecording) {
                 isRecording = false;
@@ -359,19 +371,25 @@ async function generateHighlight() {
         highlightArea.style.animation = "none";
         setTimeout(() => { highlightArea.style.animation = "fadeIn 0.8s ease-in-out"; }, 10);
 
+        // ★ GA4解析：ハイライト機能が使われたことを送信
+        if (typeof gtag === 'function') {
+            const apiType = apiKeyInput.value.trim() !== "" ? "own_key" : "trial_gas";
+            gtag('event', 'highlight_success', {
+                'api_type': apiType,
+                'app_mode': currentMode
+            });
+        }
+
     } catch (error) {
         console.error("ハイライト生成エラー:", error);
         highlightArea.style.display = "none"; 
         if (error.message === "RATE_LIMIT") {
             apiErrorAlert.style.display = 'block';
-
-            // ★ 追加：上限到達時にマイクを強制ストップし、フラグを立てる
             isApiLimitReached = true;
             if (isRecording) {
                 isRecording = false;
                 recognition.stop();
             }
-
             if (panelContent.style.display === 'none') togglePanelBtn.click();
         }
     }
